@@ -1,0 +1,93 @@
+name: Discord Commit Notification
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send commit to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          EVENT_JSON: ${{ toJson(github.event) }}
+        run: |
+          set -e
+
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          USERNAME="${{ github.event.head_commit.author.username }}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          BRANCH="${GITHUB_REF_NAME}"
+          REPO="${{ github.repository }}"
+          REPO_URL="https://github.com/${{ github.repository }}"
+          IS_PRIVATE="${{ github.event.repository.private }}"
+
+          # Fallback username
+          if [ -z "$USERNAME" ]; then
+            USERNAME="unknown"
+          fi
+
+          # Replace specific username
+          if [ "$USERNAME" = "SnapperTT" ]; then
+            USERNAME="SnapperTheTwig"
+          fi
+
+          # Extract stats cleanly
+          FILES_CHANGED=$(echo "$EVENT_JSON" | jq '.head_commit.modified + .head_commit.added + .head_commit.removed | length')
+          ADDITIONS=$(echo "$EVENT_JSON" | jq '.head_commit.stats.additions')
+          DELETIONS=$(echo "$EVENT_JSON" | jq '.head_commit.stats.deletions')
+
+          # Pluralisation
+          if [ "$FILES_CHANGED" -eq 1 ]; then
+            FILE_WORD="file changed"
+          else
+            FILE_WORD="files changed"
+          fi
+
+          if [ "$ADDITIONS" -eq 1 ]; then
+            ADD_WORD="insertion(+)"
+          else
+            ADD_WORD="insertions(+)"
+          fi
+
+          if [ "$DELETIONS" -eq 1 ]; then
+            DEL_WORD="deletion(-)"
+          else
+            DEL_WORD="deletions(-)"
+          fi
+
+          CHANGE_SUMMARY="$FILES_CHANGED $FILE_WORD, $ADDITIONS $ADD_WORD, $DELETIONS $DEL_WORD"
+
+          # Repo display (link only if public)
+          if [ "$IS_PRIVATE" = "true" ]; then
+            REPO_DISPLAY="$REPO"
+          else
+            REPO_DISPLAY="[$REPO]($REPO_URL)"
+          fi
+
+          jq -n \
+            --arg branch "$BRANCH" \
+            --arg sha "$SHORT_SHA" \
+            --arg author "$USERNAME" \
+            --arg msg "$COMMIT_MSG" \
+            --arg repo "$REPO_DISPLAY" \
+            --arg summary "$CHANGE_SUMMARY" \
+            '{
+              embeds: [{
+                title: ("New Commit on " + $branch),
+                description: ("```" + $msg + "```"),
+                color: 5814783,
+                fields: [
+                  { name: "Commit", value: $sha, inline: true },
+                  { name: "Author", value: $author, inline: true },
+                  { name: "Repo", value: $repo, inline: true },
+                  { name: "Changes", value: $summary, inline: false }
+                ]
+              }]
+            }' > payload.json
+
+          curl -H "Content-Type: application/json" \
+               -d @payload.json \
+               "$DISCORD_WEBHOOK"
