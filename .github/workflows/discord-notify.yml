@@ -1,10 +1,24 @@
 name: Discord Commit Notification
 
 on:
-  push:
-    branches:
-      - master
-
+  workflow_call:
+    inputs:
+      commit_msg:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+      sha:
+        required: true
+        type: string
+      author:
+        required: true
+        type: string
+      repo:
+        required: true
+        type: string
+        
 jobs:
   notify:
     runs-on: ubuntu-latest
