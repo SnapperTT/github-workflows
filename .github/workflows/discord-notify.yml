@@ -21,7 +21,13 @@ on:
       is_private:
         required: true
         type: boolean
-      files_changed:
+      added:
+        required: true
+        type: number
+      modified:
+        required: true
+        type: number
+      removed:
         required: true
         type: number
       additions:
@@ -30,6 +36,7 @@ on:
       deletions:
         required: true
         type: number
+
     secrets:
       DISCORD_WEBHOOK:
         required: true
@@ -44,20 +51,31 @@ jobs:
         run: |
           set -e
 
+          # Inputs from caller
           COMMIT_MSG="${{ inputs.commit_msg }}"
           USERNAME="${{ inputs.author }}"
           SHORT_SHA="${{ inputs.sha }}"
           BRANCH="${{ inputs.branch }}"
           REPO="${{ inputs.repo }}"
           IS_PRIVATE="${{ inputs.is_private }}"
-          FILES_CHANGED="${{ inputs.files_changed }}"
+          ADDED="${{ inputs.added }}"
+          MODIFIED="${{ inputs.modified }}"
+          REMOVED="${{ inputs.removed }}"
           ADDITIONS="${{ inputs.additions }}"
           DELETIONS="${{ inputs.deletions }}"
+
+          # Fallback username
+          if [ -z "$USERNAME" ]; then
+            USERNAME="unknown"
+          fi
 
           # Replace specific username
           if [ "$USERNAME" = "SnapperTT" ]; then
             USERNAME="SnapperTheTwig"
           fi
+
+          # Total files changed
+          FILES_CHANGED=$(( ADDED + MODIFIED + REMOVED ))
 
           # Pluralisation
           if [ "$FILES_CHANGED" -eq 1 ]; then
@@ -87,6 +105,7 @@ jobs:
             REPO_DISPLAY="[$REPO](https://github.com/$REPO)"
           fi
 
+          # Build JSON payload
           jq -n \
             --arg branch "$BRANCH" \
             --arg sha "$SHORT_SHA" \
@@ -108,6 +127,7 @@ jobs:
               }]
             }' > payload.json
 
+          # Send to Discord
           curl -H "Content-Type: application/json" \
                -d @payload.json \
                "$DISCORD_WEBHOOK"
