@@ -38,7 +38,8 @@ jobs:
         run: |
           COMMIT_MSG="${{ inputs.commit_msg }}"
           USERNAME="${{ inputs.author }}"
-          SHORT_SHA="${{ inputs.sha::7 }}"
+          FULL_SHA="${{ inputs.sha }}"
+          SHORT_SHA="${FULL_SHA:0:7}"   # Trim SHA to first 7 characters
           BRANCH="${{ inputs.branch }}"
           REPO="${{ inputs.repo }}"
           IS_PRIVATE="${{ inputs.is_private }}"
