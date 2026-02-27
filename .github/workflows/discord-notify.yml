@@ -21,22 +21,9 @@ on:
       is_private:
         required: true
         type: boolean
-      added:
+      stats_summary:
         required: true
-        type: number
-      modified:
-        required: true
-        type: number
-      removed:
-        required: true
-        type: number
-      additions:
-        required: true
-        type: number
-      deletions:
-        required: true
-        type: number
-
+        type: string
     secrets:
       DISCORD_WEBHOOK:
         required: true
@@ -49,70 +36,34 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          set -e
-
-          # Inputs from caller
           COMMIT_MSG="${{ inputs.commit_msg }}"
           USERNAME="${{ inputs.author }}"
-          SHORT_SHA="${{ inputs.sha }}"
+          SHORT_SHA="${{ inputs.sha::7 }}"
           BRANCH="${{ inputs.branch }}"
           REPO="${{ inputs.repo }}"
           IS_PRIVATE="${{ inputs.is_private }}"
-          ADDED="${{ inputs.added }}"
-          MODIFIED="${{ inputs.modified }}"
-          REMOVED="${{ inputs.removed }}"
-          ADDITIONS="${{ inputs.additions }}"
-          DELETIONS="${{ inputs.deletions }}"
+          STATS="${{ inputs.stats_summary }}"
 
-          # Fallback username
-          if [ -z "$USERNAME" ]; then
-            USERNAME="unknown"
-          fi
-
-          # Replace specific username
+          # Replace specific username if desired
           if [ "$USERNAME" = "SnapperTT" ]; then
             USERNAME="SnapperTheTwig"
           fi
 
-          # Total files changed
-          FILES_CHANGED=$(( ADDED + MODIFIED + REMOVED ))
-
-          # Pluralisation
-          if [ "$FILES_CHANGED" -eq 1 ]; then
-            FILE_WORD="file changed"
-          else
-            FILE_WORD="files changed"
-          fi
-
-          if [ "$ADDITIONS" -eq 1 ]; then
-            ADD_WORD="insertion(+)"
-          else
-            ADD_WORD="insertions(+)"
-          fi
-
-          if [ "$DELETIONS" -eq 1 ]; then
-            DEL_WORD="deletion(-)"
-          else
-            DEL_WORD="deletions(-)"
-          fi
-
-          CHANGE_SUMMARY="$FILES_CHANGED $FILE_WORD, $ADDITIONS $ADD_WORD, $DELETIONS $DEL_WORD"
-
-          # Repo display (link only if public)
+          # Repo display: link if public
           if [ "$IS_PRIVATE" = "true" ]; then
             REPO_DISPLAY="$REPO"
           else
             REPO_DISPLAY="[$REPO](https://github.com/$REPO)"
           fi
 
-          # Build JSON payload
+          # Build Discord payload
           jq -n \
             --arg branch "$BRANCH" \
             --arg sha "$SHORT_SHA" \
             --arg author "$USERNAME" \
             --arg msg "$COMMIT_MSG" \
             --arg repo "$REPO_DISPLAY" \
-            --arg summary "$CHANGE_SUMMARY" \
+            --arg summary "$STATS" \
             '{
               embeds: [{
                 title: ("New Commit on " + $branch),
